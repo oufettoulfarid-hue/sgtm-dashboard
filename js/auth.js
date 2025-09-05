@@ -6,6 +6,7 @@ const authorizedUsers = {
     'Troncon4': 'Badr4'
 };
 
+// Variables globales pour l'authentification
 let currentUser = '';
 
 // Système d'authentification
