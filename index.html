@@ -1,879 +1,4 @@
-// Calculer l'avancement journalier pour aujourd'hui
-                    const today = new Date().toISOString().split('T')[0];
-                    const todayProgress = dailyHistory
-                        .filter(entry => entry.date === today && entry.troncon === tronconName && entry.activity === activityName)
-                        .reduce((sum, entry) => sum + entry.dailyProgress, 0);
-                    
-                    row.innerHTML = `
-                        <td style="font-weight: 600; color: #2c3e50;">
-                            <span class="activity-icon"><i class="${getActivityIcon(activityName)}"></i></span>
-                            ${activityName}
-                        </td>
-                        <td>${formatNumber(activityData.cumul)} ml</td>
-                        <td>${formatNumber(activityData.target)} ml</td>
-                        <td>
-                            <div class="progress-bar">
-                                <div class="progress-fill" style="width: ${Math.min(percentage, 100)}%">
-                                    <div class="progress-text">${percentage}%</div>
-                                </div>
-                            </div>
-                        </td>
-                        <td>
-                            <input type="number" class="daily-input" style="width: 100px; padding: 0.3rem; border-radius: 5px; border: none; text-align: center;" 
-                                   min="0" step="0.1" placeholder="0" value="${todayProgress > 0 ? formatNumber(todayProgress) : ''}"
-                                   onchange="updateDailyProgress('${tronconName}', '${activityName}', this.value)">
-                            <div style="font-size: 0.8rem; color: #666; margin-top: 0.2rem;"><i class="fas fa-ruler"></i> ml/jour</div>
-                        </td>
-                        <td>
-                            <button class="edit-btn" onclick="editActivity('${tronconName}', '${activityName}')">
-                                <i class="fas fa-edit"></i> Modifier
-                            </button>
-                            <button class="delete-btn" onclick="deleteActivity('${tronconName}', '${activityName}')">
-                                <i class="fas fa-trash"></i> Supprimer
-                            </button>
-                        </td>
-                    `;
-                    
-                    tbody.appendChild(row);
-                });
-                
-                table.appendChild(thead);
-                table.appendChild(tbody);
-                tronconCard.appendChild(header);
-                tronconCard.appendChild(table);
-                container.appendChild(tronconCard);
-            });
-        }
-
-        function updateDailyProgress(troncon, activity, value) {
-            const today = new Date().toISOString().split('T')[0];
-            const dailyProgress = parseFloat(value) || 0;
-            
-            if (dailyProgress < 0) {
-                showNotification('La valeur ne peut pas être négative', 'error');
-                renderTroncons();
-                return;
-            }
-            
-            // Supprimer les entrées existantes pour aujourd'hui
-            dailyHistory = dailyHistory.filter(entry => 
-                !(entry.date === today && entry.troncon === troncon && entry.activity === activity)
-            );
-            
-            // Ajouter la nouvelle entrée si la valeur est positive
-            if (dailyProgress > 0) {
-                dailyHistory.push({
-                    date: today,
-                    troncon,
-                    activity,
-                    dailyProgress,
-                    user: currentUser,
-                    timestamp: new Date().toISOString()
-                });
-            }
-            
-            // Recalculer le cumul : valeur initiale + historique
-            const initialValue = getInitialValue(troncon, activity);
-            const totalFromHistory = dailyHistory
-                .filter(entry => entry.troncon === troncon && entry.activity === activity)
-                .reduce((sum, entry) => sum + entry.dailyProgress, 0);
-            
-            troncons[troncon].activities[activity].cumul = initialValue + totalFromHistory;
-            
-            updateStats();
-            updateAllCharts();
-            silentAutoSave();
-            
-            if (dailyProgress > 0) {
-                showNotification(`Avancement journalier mis à jour: ${formatNumber(dailyProgress)} ml`, 'success');
-            }
-        }
-
-        function updateStats() {
-            const totalTroncons = Object.keys(troncons).length;
-            
-            let totalDistance = 0;
-            let totalTerrassement = 0;
-            let totalPose = 0;
-            let totalLivraison = 0;
-            let totalLitPose = 0;
-            let totalRP = 0;
-            let totalRS = 0;
-            
-            Object.values(troncons).forEach(troncon => {
-                totalDistance += troncon.distanceTotale;
-                
-                if (troncon.activities.terrassement) {
-                    totalTerrassement += troncon.activities.terrassement.cumul;
-                }
-                
-                if (troncon.activities['pose conduite']) {
-                    totalPose += troncon.activities['pose conduite'].cumul;
-                }
-                
-                if (troncon.activities['Livraison conduite']) {
-                    totalLivraison += troncon.activities['Livraison conduite'].cumul;
-                }
-                
-                if (troncon.activities['lit de pose']) {
-                    totalLitPose += troncon.activities['lit de pose'].cumul;
-                }
-                
-                if (troncon.activities['RP']) {
-                    totalRP += troncon.activities['RP'].cumul;
-                }
-                
-                if (troncon.activities['RS']) {
-                    totalRS += troncon.activities['RS'].cumul;
-                }
-            });
-            
-            document.getElementById('totalTroncons').textContent = totalTroncons;
-            document.getElementById('globalTerrassement').textContent = totalDistance > 0 ? Math.round((totalTerrassement / totalDistance) * 100) + '%' : '0%';
-            document.getElementById('globalPose').textContent = totalDistance > 0 ? Math.round((totalPose / totalDistance) * 100) + '%' : '0%';
-            document.getElementById('globalLivraison').textContent = totalDistance > 0 ? Math.round((totalLivraison / totalDistance) * 100) + '%' : '0%';
-            document.getElementById('globalLitPose').textContent = totalDistance > 0 ? Math.round((totalLitPose / totalDistance) * 100) + '%' : '0%';
-            document.getElementById('globalRP').textContent = totalDistance > 0 ? Math.round((totalRP / totalDistance) * 100) + '%' : '0%';
-            document.getElementById('globalRS').textContent = totalDistance > 0 ? Math.round((totalRS / totalDistance) * 100) + '%' : '0%';
-        }
-
-        function editActivity(troncon, activity) {
-            editingTroncon = troncon;
-            editingActivity = activity;
-            
-            const activityData = troncons[troncon].activities[activity];
-            document.getElementById('editActivity').value = activity;
-            document.getElementById('editCumul').value = activityData.cumul;
-            document.getElementById('editTarget').value = activityData.target;
-            
-            document.getElementById('editModal').style.display = 'block';
-        }
-
-        function deleteActivity(troncon, activity) {
-            if (confirm(`Êtes-vous sûr de vouloir supprimer l'activité "${activity}" du ${troncon}?`)) {
-                delete troncons[troncon].activities[activity];
-                
-                // Supprimer aussi de l'historique
-                dailyHistory = dailyHistory.filter(entry => 
-                    !(entry.troncon === troncon && entry.activity === activity)
-                );
-                
-                renderTroncons();
-                updateStats();
-                updateAllCharts();
-                silentAutoSave();
-                showNotification('Activité supprimée', 'success');
-            }
-        }
-
-        function addNewActivity(troncon) {
-            const activityName = prompt('Nom de la nouvelle activité:');
-            const target = parseFloat(prompt('Objectif (quantité totale en ml):'));
-            
-            if (activityName && target) {
-                troncons[troncon].activities[activityName] = {
-                    cumul: 0,
-                    target: target,
-                    unit: 'ml'
-                };
-                
-                renderTroncons();
-                updateStats();
-                updateAllCharts();
-                silentAutoSave();
-                showNotification(`Activité "${activityName}" ajoutée avec succès`, 'success');
-            }
-        }
-
-        function addNewTroncon() {
-            const name = prompt('Nom du nouveau tronçon:');
-            const longueur = prompt('Longueur du tronçon (ex: 5.2KM):');
-            const distanceTotale = parseFloat(prompt('Distance totale (en ml):'));
-            
-            if (name && longueur && distanceTotale && !isNaN(distanceTotale)) {
-                troncons[name] = {
-                    longueur: longueur,
-                    distanceTotale: distanceTotale,
-                    activities: {
-                        'terrassement': { cumul: 0, target: distanceTotale, unit: 'ml' }
-                    }
-                };
-                
-                populateTronconSelect();
-                renderTroncons();
-                updateStats();
-                updateAllCharts();
-                silentAutoSave();
-                showNotification(`Tronçon "${name}" ajouté avec succès`, 'success');
-            } else {
-                showNotification('Données invalides', 'error');
-            }
-        }
-
-        document.getElementById('editForm').addEventListener('submit', function(e) {
-            e.preventDefault();
-            
-            const newCumul = parseFloat(document.getElementById('editCumul').value);
-            const newTarget = parseFloat(document.getElementById('editTarget').value);
-            
-            troncons[editingTroncon].activities[editingActivity].cumul = newCumul;
-            troncons[editingTroncon].activities[editingActivity].target = newTarget;
-            
-            closeModal();
-            renderTroncons();
-            updateStats();
-            updateAllCharts();
-            silentAutoSave();
-            showNotification('Données modifiées avec succès', 'success');
-        });
-
-        function closeModal() {
-            document.getElementById('editModal').style.display = 'none';
-        }
-
-        document.querySelector('.close').addEventListener('click', closeModal);
-
-        window.addEventListener('click', function(event) {
-            const modal = document.getElementById('editModal');
-            if (event.target === modal) {
-                closeModal();
-            }
-        });
-
-        // Gestion des graphiques
-        function createAllCharts() {
-            createGlobalChart();
-        }
-
-        function createGlobalChart() {
-            const ctx = document.getElementById('globalChart').getContext('2d');
-            
-            if (charts.globalChart) {
-                charts.globalChart.destroy();
-            }
-            
-            const allActivities = new Set();
-            Object.values(troncons).forEach(tronconData => {
-                Object.keys(tronconData.activities).forEach(activity => {
-                    allActivities.add(activity);
-                });
-            });
-            
-            const activityArray = Array.from(allActivities);
-            const tronconNames = Object.keys(troncons);
-            
-            const activityColors = {
-                'terrassement': '#f4a261',
-                'pose conduite': '#2a9d8f',
-                'Livraison conduite': '#e76f51',
-                'lit de pose': '#264653',
-                'RP': '#457b9d',
-                'RS': '#9c89b8'
-            };
-            
-            const datasets = activityArray.map(activity => {
-                const data = tronconNames.map(troncon => {
-                    const tronconData = troncons[troncon];
-                    if (tronconData.activities[activity]) {
-                        return Math.round((tronconData.activities[activity].cumul / tronconData.activities[activity].target) * 100);
-                    }
-                    return 0;
-                });
-                
-                return {
-                    label: activity.charAt(0).toUpperCase() + activity.slice(1),
-                    data: data,
-                    backgroundColor: activityColors[activity] || '#ffd700',
-                    borderColor: '#1a1a1a',
-                    borderWidth: 1
-                };
-            });
-            
-            charts.globalChart = new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: tronconNames,
-                    datasets: datasets
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            position: 'top',
-                            labels: {
-                                color: '#ffd700',
-                                font: { size: 11 },
-                                usePointStyle: true,
-                                padding: 15
-                            }
-                        }
-                    },
-                    scales: {
-                        y: {
-                            beginAtZero: true,
-                            max: 100,
-                            ticks: {
-                                color: '#ffd700',
-                                callback: function(value) {
-                                    return value + '%';
-                                }
-                            },
-                            grid: { color: 'rgba(255, 215, 0, 0.2)' },
-                            title: {
-                                display: true,
-                                text: 'Pourcentage de progression',
-                                color: '#ffd700'
-                            }
-                        },
-                        x: {
-                            ticks: { color: '#ffd700' },
-                            grid: { color: 'rgba(255, 215, 0, 0.2)' },
-                            title: {
-                                display: true,
-                                text: 'Tronçons',
-                                color: '#ffd700'
-                            }
-                        }
-                    }
-                }
-            });
-        }
-
-        function createLinearChart(tronconName, specificActivity = null) {
-            const ctx = document.getElementById('linearChart').getContext('2d');
-            
-            if (charts.linearChart) {
-                charts.linearChart.destroy();
-            }
-            
-            if (!troncons[tronconName]) return;
-            
-            let filteredHistory = dailyHistory.filter(entry => entry.troncon === tronconName);
-            
-            if (dateFilter) {
-                filteredHistory = filteredHistory.filter(entry => 
-                    entry.date >= dateFilter.start && entry.date <= dateFilter.end
-                );
-            }
-            
-            if (specificActivity) {
-                filteredHistory = filteredHistory.filter(entry => entry.activity === specificActivity);
-            }
-            
-            const allDates = [...new Set(filteredHistory.map(entry => entry.date))].sort();
-            
-            if (allDates.length === 0) {
-                const tronconData = troncons[tronconName];
-                const activities = specificActivity ? [specificActivity] : Object.keys(tronconData.activities);
-                
-                const activityColors = {
-                    'terrassement': '#f4a261',
-                    'pose conduite': '#2a9d8f',
-                    'Livraison conduite': '#e76f51',
-                    'lit de pose': '#264653',
-                    'RP': '#457b9d',
-                    'RS': '#9c89b8'
-                };
-                
-                const datasets = activities.map(activity => {
-                    const currentValue = tronconData.activities[activity] ? tronconData.activities[activity].cumul : 0;
-                    return {
-                        label: activity,
-                        data: [currentValue],
-                        borderColor: activityColors[activity] || '#ffd700',
-                        backgroundColor: (activityColors[activity] || '#ffd700') + '20',
-                        fill: false,
-                        tension: 0.1
-                    };
-                });
-                
-                charts.linearChart = new Chart(ctx, {
-                    type: 'line',
-                    data: {
-                        labels: ['Cumul actuel'],
-                        datasets: datasets
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: {
-                            legend: {
-                                position: 'top',
-                                labels: { color: '#ffd700', font: { size: 11 }, usePointStyle: true }
-                            }
-                        },
-                        scales: {
-                            y: {
-                                beginAtZero: true,
-                                ticks: { color: '#ffd700' },
-                                grid: { color: 'rgba(255, 215, 0, 0.2)' }
-                            },
-                            x: {
-                                ticks: { color: '#ffd700' },
-                                grid: { color: 'rgba(255, 215, 0, 0.2)' }
-                            }
-                        }
-                    }
-                });
-                return;
-            }
-            
-            const activities = specificActivity ? [specificActivity] : Object.keys(troncons[tronconName].activities);
-            
-            const activityColors = {
-                'terrassement': '#f4a261',
-                'pose conduite': '#2a9d8f',
-                'Livraison conduite': '#e76f51',
-                'lit de pose': '#264653',
-                'RP': '#457b9d',
-                'RS': '#9c89b8'
-            };
-            
-            const datasets = activities.map(activity => {
-                const data = [];
-                let cumulativeSum = getInitialValue(tronconName, activity);
-                
-                allDates.forEach(date => {
-                    const dayEntries = filteredHistory.filter(entry => 
-                        entry.date === date && entry.activity === activity
-                    );
-                    
-                    const dayTotal = dayEntries.reduce((sum, entry) => sum + entry.dailyProgress, 0);
-                    cumulativeSum += dayTotal;
-                    data.push(cumulativeSum);
-                });
-                
-                return {
-                    label: activity,
-                    data: data,
-                    borderColor: activityColors[activity] || '#ffd700',
-                    backgroundColor: (activityColors[activity] || '#ffd700') + '20',
-                    fill: false,
-                    tension: 0.1,
-                    borderWidth: 2,
-                    pointRadius: 4,
-                    pointHoverRadius: 6
-                };
-            });
-            
-            charts.linearChart = new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: allDates.map(date => {
-                        const d = new Date(date);
-                        return `${d.getDate()}/${d.getMonth() + 1}`;
-                    }),
-                    datasets: datasets
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            position: 'top',
-                            labels: { color: '#ffd700', font: { size: 11 }, usePointStyle: true }
-                        }
-                    },
-                    scales: {
-                        y: {
-                            beginAtZero: true,
-                            ticks: { color: '#ffd700' },
-                            grid: { color: 'rgba(255, 215, 0, 0.2)' }
-                        },
-                        x: {
-                            ticks: { color: '#ffd700' },
-                            grid: { color: 'rgba(255, 215, 0, 0.2)' }
-                        }
-                    }
-                }
-            });
-        }
-
-        function updateAllCharts() {
-            createAllCharts();
-            
-            const selectedTroncon = document.getElementById('tronconChartSelect').value;
-            const selectedActivity = document.getElementById('activityChartSelect').value;
-            if (selectedTroncon) {
-                createLinearChart(selectedTroncon, selectedActivity || null);
-            }
-        }
-
-        // Fonctions de filtrage par date
-        function filterByDate() {
-            const startDate = document.getElementById('startDate').value;
-            const endDate = document.getElementById('endDate').value;
-            
-            if (!startDate || !endDate) {
-                showNotification('Veuillez sélectionner les deux dates', 'error');
-                return;
-            }
-            
-            if (startDate > endDate) {
-                showNotification('La date de début ne peut pas être supérieure à la date de fin', 'error');
-                return;
-            }
-            
-            dateFilter = { start: startDate, end: endDate };
-            showNotification(`Filtrage appliqué du ${startDate} au ${endDate}`, 'success');
-            
-            const selectedTroncon = document.getElementById('tronconChartSelect').value;
-            const selectedActivity = document.getElementById('activityChartSelect').value;
-            if (selectedTroncon) {
-                createLinearChart(selectedTroncon, selectedActivity || null);
-            }
-        }
-
-        function clearDateFilter() {
-            dateFilter = null;
-            document.getElementById('startDate').value = '';
-            document.getElementById('endDate').value = '';
-            showNotification('Filtre de date supprimé', 'success');
-            
-            const selectedTroncon = document.getElementById('tronconChartSelect').value;
-            const selectedActivity = document.getElementById('activityChartSelect').value;
-            if (selectedTroncon) {
-                createLinearChart(selectedTroncon, selectedActivity || null);
-            }
-        }
-
-        // Fonctions d'export
-        function exportToExcel() {
-            const wb = XLSX.utils.book_new();
-            
-            const summaryData = [];
-            summaryData.push(['SGTM - Tableau de Bord Travaux']);
-            summaryData.push(['Date d\'export:', new Date().toLocaleDateString('fr-FR')]);
-            summaryData.push(['Exporté par:', currentUser]);
-            summaryData.push([]);
-            summaryData.push(['Tronçon', 'Longueur', 'Activité', 'Cumul (ml)', 'Objectif (ml)', 'Rendement (%)']);
-            
-            Object.entries(troncons).forEach(([tronconName, tronconData]) => {
-                Object.entries(tronconData.activities).forEach(([activityName, activityData]) => {
-                    const percentage = Math.round((activityData.cumul / activityData.target) * 100);
-                    summaryData.push([
-                        tronconName,
-                        tronconData.longueur,
-                        activityName,
-                        activityData.cumul,
-                        activityData.target,
-                        percentage
-                    ]);
-                });
-            });
-            
-            const ws1 = XLSX.utils.aoa_to_sheet(summaryData);
-            XLSX.utils.book_append_sheet(wb, ws1, 'Résumé');
-            
-            if (dailyHistory.length > 0) {
-                const historyData = [['Date', 'Tronçon', 'Activité', 'Avancement (ml)', 'Utilisateur', 'Timestamp']];
-                dailyHistory.forEach(entry => {
-                    historyData.push([
-                        entry.date, 
-                        entry.troncon, 
-                        entry.activity, 
-                        entry.dailyProgress,
-                        entry.user || 'N/A',
-                        entry.timestamp || 'N/A'
-                    ]);
-                });
-                
-                const ws2 = XLSX.utils.aoa_to_sheet(historyData);
-                XLSX.utils.book_append_sheet(wb, ws2, 'Historique');
-            }
-            
-            XLSX.writeFile(wb, `SGTM_Travaux_${new Date().toISOString().split('T')[0]}.xlsx`);
-            showNotification('Export Excel réussi!', 'success');
-        }
-
-        function exportToPDF() {
-            const { jsPDF } = window.jspdf;
-            const doc = new jsPDF('p', 'mm', 'a4');
-            
-            doc.setFontSize(24);
-            doc.text('SGTM - Tableau de Bord Travaux', 20, 25);
-            
-            doc.setFontSize(12);
-            const now = new Date();
-            const dateStr = `${now.getDate().toString().padStart(2, '0')}/${(now.getMonth() + 1).toString().padStart(2, '0')}/${now.getFullYear()}`;
-            
-            doc.text(`Date d'export: ${dateStr}`, 20, 35);
-            doc.text(`Exporté par: ${currentUser}`, 20, 42);
-            
-            let startY = 55;
-            
-            Object.entries(troncons).forEach(([tronconName, tronconData]) => {
-                if (startY > 220) {
-                    doc.addPage();
-                    startY = 20;
-                }
-                
-                doc.setFontSize(16);
-                doc.text(`${tronconName} - ${tronconData.longueur}`, 20, startY);
-                
-                const tableData = [];
-                Object.entries(tronconData.activities).forEach(([activityName, activityData]) => {
-                    const percentage = Math.round((activityData.cumul / activityData.target) * 100);
-                    tableData.push([
-                        activityName,
-                        activityData.cumul.toFixed(1) + ' ml',
-                        activityData.target.toFixed(1) + ' ml',
-                        percentage + '%'
-                    ]);
-                });
-                
-                doc.autoTable({
-                    head: [['Activité', 'Cumul (ml)', 'Objectif (ml)', 'Rendement (%)']],
-                    body: tableData,
-                    startY: startY + 5,
-                    margin: { left: 20, right: 20 }
-                });
-                
-                startY = doc.lastAutoTable.finalY + 15;
-            });
-            
-            const filename = `SGTM_Travaux_${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}-${now.getDate().toString().padStart(2, '0')}.pdf`;
-            doc.save(filename);
-            
-            showNotification('Export PDF réussi!', 'success');
-        }
-
-        // Fonctions de sauvegarde et chargement
-        async function saveToDatabase() {
-            const dataToSave = {
-                troncons: troncons,
-                dailyHistory: dailyHistory,
-                lastUpdated: new Date().toISOString(),
-                updatedBy: currentUser,
-                version: '3.2'
-            };
-            
-            localStorage.setItem('sgtm_data', JSON.stringify(dataToSave));
-            
-            const result = await cloudDB.save(dataToSave);
-            
-            if (result.success) {
-                showNotification('Données synchronisées en ligne!', 'success');
-            } else {
-                showNotification('Sauvegarde locale uniquement', 'error');
-            }
-        }
-
-        async function loadFromDatabase() {
-            const cloudResult = await cloudDB.load();
-            
-            if (cloudResult.success && cloudResult.data.dailyHistory) {
-                dailyHistory = cloudResult.data.dailyHistory || [];
-                troncons = cloudResult.data.troncons || JSON.parse(JSON.stringify(defaultTroncons));
-                showNotification('Données chargées depuis le cloud!', 'success');
-            } else {
-                const savedData = localStorage.getItem('sgtm_data');
-                if (savedData) {
-                    const parsedData = JSON.parse(savedData);
-                    dailyHistory = parsedData.dailyHistory || [];
-                    troncons = parsedData.troncons || JSON.parse(JSON.stringify(defaultTroncons));
-                    showNotification('Données chargées localement', 'success');
-                } else {
-                    troncons = JSON.parse(JSON.stringify(defaultTroncons));
-                    dailyHistory = [];
-                }
-            }
-            
-            recalculateAllCumuls();
-            renderTroncons();
-            updateStats();
-            updateAllCharts();
-            populateTronconSelect();
-        }
-
-        function showDailyReport() {
-            const today = new Date().toISOString().split('T')[0];
-            const todayEntries = dailyHistory.filter(entry => entry.date === today);
-            
-            if (todayEntries.length === 0) {
-                showNotification('Aucune activité enregistrée pour aujourd\'hui', 'error');
-                return;
-            }
-            
-            let report = `RAPPORT JOURNALIER - ${today}\n\n`;
-            let totalVolume = 0;
-            
-            const groupedEntries = {};
-            todayEntries.forEach(entry => {
-                const key = `${entry.troncon} - ${entry.activity}`;
-                if (!groupedEntries[key]) {
-                    groupedEntries[key] = 0;
-                }
-                groupedEntries[key] += entry.dailyProgress;
-                totalVolume += entry.dailyProgress;
-            });
-            
-            Object.entries(groupedEntries).forEach(([key, value]) => {
-                report += `${key}: ${formatNumber(value)} ml\n`;
-            });
-            
-            report += `\nVolume total du jour: ${formatNumber(totalVolume)} ml`;
-            alert(report);
-        }
-
-        function resetData() {
-            if (confirm('Êtes-vous sûr de vouloir réinitialiser toutes les données?')) {
-                troncons = JSON.parse(JSON.stringify(defaultTroncons));
-                dailyHistory = [];
-                
-                renderTroncons();
-                updateStats();
-                updateAllCharts();
-                populateTronconSelect();
-                silentAutoSave();
-                showNotification('Données réinitialisées', 'success');
-            }
-        }
-
-        function formatNumber(num) {
-            return num.toLocaleString('fr-FR', {
-                minimumFractionDigits: 0,
-                maximumFractionDigits: 1
-            });
-        }
-
-        // Notifications
-        function showNotification(message, type = 'success') {
-            const notification = document.createElement('div');
-            notification.style.cssText = `
-                position: fixed;
-                top: 20px;
-                right: 20px;
-                background: ${type === 'success' ? 'linear-gradient(135deg, #ffd700 0%, #ffed4e 100%)' : 'linear-gradient(135deg, #ff4444 0%, #cc0000 100%)'};
-                color: ${type === 'success' ? '#1a1a1a' : 'white'};
-                padding: 1rem 1.5rem;
-                border-radius: 8px;
-                box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-                z-index: 1001;
-                animation: slideInRight 0.3s ease;
-                font-weight: 600;
-                max-width: 300px;
-                display: flex;
-                align-items: center;
-                gap: 0.5rem;
-            `;
-            
-            const icon = type === 'success' ? '<i class="fas fa-check-circle"></i>' : '<i class="fas fa-exclamation-triangle"></i>';
-            notification.innerHTML = `${icon} ${message}`;
-            
-            document.body.appendChild(notification);
-            
-            setTimeout(() => {
-                notification.style.animation = 'slideOutRight 0.3s ease';
-                setTimeout(() => {
-                    if (document.body.contains(notification)) {
-                        document.body.removeChild(notification);
-                    }
-                }, 300);
-            }, 3000);
-        }
-
-        // Sauvegarde automatique avant de quitter
-        window.addEventListener('beforeunload', function() {
-            silentAutoSave();
-        });
-    </script>
-</body>
-</html>        document.getElementById('progressForm').addEventListener('submit', function(e) {
-            e.preventDefault();
-            
-            const troncon = document.getElementById('tronconSelect').value;
-            const activity = document.getElementById('activitySelect').value;
-            const dailyProgress = parseFloat(document.getElementById('dailyProgress').value);
-            const date = document.getElementById('date').value;
-            
-            if (!troncon || !activity || dailyProgress === '' || !date) {
-                showNotification('Veuillez remplir tous les champs', 'error');
-                return;
-            }
-            
-            if (dailyProgress < 0) {
-                showNotification('La valeur ne peut pas être négative', 'error');
-                return;
-            }
-            
-            // Ajouter à l'historique
-            dailyHistory.push({
-                date,
-                troncon,
-                activity,
-                dailyProgress,
-                user: currentUser,
-                timestamp: new Date().toISOString()
-            });
-            
-            // Mettre à jour le cumul avec la valeur initiale + historique
-            const initialValue = getInitialValue(troncon, activity);
-            const totalFromHistory = dailyHistory
-                .filter(entry => entry.troncon === troncon && entry.activity === activity)
-                .reduce((sum, entry) => sum + entry.dailyProgress, 0);
-            
-            troncons[troncon].activities[activity].cumul = initialValue + totalFromHistory;
-            
-            // Réinitialiser le formulaire
-            this.reset();
-            initializeDateInput();
-            document.getElementById('activitySelect').innerHTML = '<option value="">Sélectionner une activité</option>';
-            
-            // Mettre à jour l'affichage
-            renderTroncons();
-            updateStats();
-            updateAllCharts();
-            silentAutoSave();
-            
-            showNotification(`Avancement ajouté: ${formatNumber(dailyProgress)} ml pour ${activity}`, 'success');
-        });
-
-        function renderTroncons() {
-            const container = document.getElementById('tronconsList');
-            container.innerHTML = '';
-            
-            Object.entries(troncons).forEach(([tronconName, tronconData]) => {
-                const tronconCard = document.createElement('div');
-                tronconCard.className = 'troncon-card';
-                
-                const header = document.createElement('div');
-                header.className = 'troncon-header';
-                header.innerHTML = `
-                    <i class="fas fa-road"></i> ${tronconName} - ${tronconData.longueur}
-                    <button style="float: right; background: #1a1a1a; color: #ffd700; border: 1px solid #ffd700; padding: 0.3rem 0.8rem; border-radius: 5px; cursor: pointer;" 
-                            onclick="addNewActivity('${tronconName}')">
-                        <i class="fas fa-plus"></i> Activité
-                    </button>
-                `;
-                
-                const table = document.createElement('table');
-                table.className = 'activities-table';
-                
-                const thead = document.createElement('thead');
-                thead.innerHTML = `
-                    <tr>
-                        <th><i class="fas fa-tasks"></i> Activité</th>
-                        <th><i class="fas fa-chart-line"></i> Cumul (ml)</th>
-                        <th><i class="fas fa-bullseye"></i> Objectif (ml)</th>
-                        <th><i class="fas fa-percentage"></i> Rendement</th>
-                        <th><i class="fas fa-calendar-day"></i> Avancement Journalier</th>
-                        <th><i class="fas fa-cogs"></i> Actions</th>
-                    </tr>
-                `;
-                
-                const tbody = document.createElement('tbody');
-                
-                Object.entries(tronconData.activities).forEach(([activityName, activityData]) => {
-                    const percentage = Math.round((activityData.cumul / activityData.target) * 100);
-                    const row = document.createElement('tr');
-                    
-                    // Calculer l'avancement journalier pour aujourd'hui
-                    const today = new Date().toISOString().split('T')[0];
-                    const todayProgress = dailyHistory
-                        .filter(entry => entry.date === today && entry.troncon === tronconName && entry.activity === activityName)
-                        .<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
@@ -896,46 +21,6 @@
             background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
             min-height: 100vh;
             color: #333;
-        }
-
-        /* Indicateur de synchronisation */
-        .sync-indicator {
-            position: fixed;
-            top: 20px;
-            left: 20px;
-            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
-            color: white;
-            padding: 0.5rem 1rem;
-            border-radius: 20px;
-            font-size: 0.8rem;
-            z-index: 1000;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-            transition: all 0.3s ease;
-        }
-
-        .sync-indicator.syncing {
-            background: linear-gradient(135deg, #ffc107 0%, #ff8f00 100%);
-            color: #1a1a1a;
-        }
-
-        .sync-indicator.error {
-            background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
-        }
-
-        .sync-icon {
-            animation: none;
-        }
-
-        .sync-indicator.syncing .sync-icon {
-            animation: spin 1s linear infinite;
-        }
-
-        @keyframes spin {
-            from { transform: rotate(0deg); }
-            to { transform: rotate(360deg); }
         }
 
         /* Page de connexion */
@@ -1546,11 +631,6 @@
                 min-width: 300px;
                 margin: 1rem;
             }
-
-            .sync-indicator {
-                position: relative;
-                margin: 1rem;
-            }
         }
 
         @keyframes slideInRight {
@@ -1583,17 +663,11 @@
     </style>
 </head>
 <body>
-    <!-- Indicateur de synchronisation -->
-    <div id="syncIndicator" class="sync-indicator">
-        <i class="fas fa-cloud sync-icon"></i>
-        <span>Synchronisé</span>
-    </div>
-
     <!-- Page de connexion -->
     <div id="loginPage" class="login-container">
         <div class="login-card">
             <h1 class="login-title"><i class="fas fa-hard-hat"></i> SGTM</h1>
-            <p class="login-subtitle">Tableau de Bord - Suivi des Travaux<br><small>Version partageable en temps réel</small></p>
+            <p class="login-subtitle">Tableau de Bord - Suivi des Travaux</p>
             <form id="loginForm" class="login-form">
                 <input type="text" id="username" class="login-input" placeholder="👤 Nom d'utilisateur" required>
                 <input type="password" id="accessCode" class="login-input" placeholder="🔒 Code d'accès" required>
@@ -1650,7 +724,687 @@
             <!-- Statistiques générales -->
             <div class="stats-grid">
                 <div class="stat-card">
-                    <div class="stat-value"><i class="fas fa-road"></i> <span id="totalTroncons">0</span></div>
+                    <div class="actions">
+                        <button type="submit" class="btn btn-primary"><i class="fas fa-plus"></i> Ajouter l'Avancement</button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Graphiques principaux -->
+            <div class="charts-main-container">
+                <div class="chart-card">
+                    <h3><i class="fas fa-chart-bar"></i> Avancement Global - Tous les Tronçons</h3>
+                    <canvas id="globalChart" width="400" height="300"></canvas>
+                </div>
+            </div>
+
+            <!-- Section graphiques linéaires -->
+            <div class="linear-charts-section">
+                <h3><i class="fas fa-chart-line"></i> Évolution Temporelle par Tronçon</h3>
+                <div style="margin-bottom: 1rem;">
+                    <select id="tronconChartSelect" style="padding: 0.5rem; border-radius: 5px; background: #1a1a1a; color: white; border: 1px solid #ffd700;">
+                        <option value="">Sélectionner un tronçon</option>
+                    </select>
+                    <select id="activityChartSelect" style="padding: 0.5rem; border-radius: 5px; background: #1a1a1a; color: white; border: 1px solid #ffd700; margin-left: 1rem;">
+                        <option value="">Toutes les activités</option>
+                    </select>
+                </div>
+                <div id="linearChartContainer" class="linear-chart-container" style="display: none;">
+                    <canvas id="linearChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Tableau des tronçons -->
+            <div class="dashboard-grid">
+                <div class="troncons-container">
+                    <div id="tronconsList"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal pour édition -->
+    <div id="editModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2 style="color: #ffd700; margin-bottom: 1.5rem;"><i class="fas fa-edit"></i> Modifier l'Activité</h2>
+            <form id="editForm">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="editActivity"><i class="fas fa-tag"></i> Activité</label>
+                        <input type="text" id="editActivity" readonly>
+                    </div>
+                    <div class="form-group">
+                        <label for="editCumul"><i class="fas fa-chart-line"></i> Cumul Total (ml)</label>
+                        <input type="number" id="editCumul" step="0.1" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="editTarget"><i class="fas fa-bullseye"></i> Objectif (ml)</label>
+                        <input type="number" id="editTarget" step="0.1" required>
+                    </div>
+                </div>
+                <div class="actions">
+                    <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Sauvegarder</button>
+                    <button type="button" class="btn btn-secondary" onclick="closeModal()"><i class="fas fa-times"></i> Annuler</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // Configuration des utilisateurs autorisés
+        const authorizedUsers = {
+            'troncon12': 'KhFa1212',
+            'directeur': 'Ahmed El jami',
+            'Troncon3': 'Abdo3',
+            'Troncon4': 'Badr4'
+        };
+
+        // Données initiales par défaut
+        const defaultTroncons = {
+            'Tronçon 1': {
+                longueur: '4.2KM',
+                distanceTotale: 4258,
+                activities: {
+                    'terrassement': { cumul: 3918.55, target: 4258, unit: 'ml' },
+                    'Livraison conduite': { cumul: 0, target: 4258, unit: 'ml' },
+                    'pose conduite': { cumul: 0, target: 4258, unit: 'ml' },
+                    'lit de pose': { cumul: 0, target: 4258, unit: 'ml' },
+                    'RP': { cumul: 0, target: 4258, unit: 'ml' },
+                    'RS': { cumul: 0, target: 4258, unit: 'ml' }
+                }
+            },
+            'Tronçon 2': {
+                longueur: '24KM',
+                distanceTotale: 23940,
+                activities: {
+                    'terrassement': { cumul: 23940, target: 23940, unit: 'ml' },
+                    'Livraison conduite': { cumul: 16094, target: 23940, unit: 'ml' },
+                    'pose conduite': { cumul: 15391, target: 23940, unit: 'ml' },
+                    'lit de pose': { cumul: 17084, target: 23940, unit: 'ml' },
+                    'RP': { cumul: 11937, target: 23940, unit: 'ml' },
+                    'RS': { cumul: 11605, target: 23940, unit: 'ml' }
+                }
+            },
+            'Tronçon 3': {
+                longueur: '11.9KM',
+                distanceTotale: 11873,
+                activities: {
+                    'terrassement': { cumul: 8072, target: 11873, unit: 'ml' },
+                    'Livraison conduite': { cumul: 3392.4, target: 11873, unit: 'ml' },
+                    'pose conduite': { cumul: 1943, target: 11873, unit: 'ml' },
+                    'lit de pose': { cumul: 1975, target: 11873, unit: 'ml' },
+                    'RP': { cumul: 0, target: 11873, unit: 'ml' },
+                    'RS': { cumul: 0, target: 11873, unit: 'ml' }
+                }
+            },
+            'Tronçon 4': {
+                longueur: '7.5KM',
+                distanceTotale: 7614,
+                activities: {
+                    'terrassement': { cumul: 6373.6, target: 7614, unit: 'ml' },
+                    'Livraison conduite': { cumul: 7563.6, target: 7614, unit: 'ml' },
+                    'pose conduite': { cumul: 4514.4, target: 7614, unit: 'ml' },
+                    'lit de pose': { cumul: 4728, target: 7614, unit: 'ml' },
+                    'RP': { cumul: 0, target: 7614, unit: 'ml' },
+                    'RS': { cumul: 0, target: 7614, unit: 'ml' }
+                }
+            }
+        };
+
+        // Variables globales
+        let troncons = {};
+        let dailyHistory = [];
+        let editingTroncon = null;
+        let editingActivity = null;
+        let charts = {};
+        let currentUser = '';
+        let dateFilter = null;
+
+        // Fonction pour récupérer la valeur initiale d'une activité
+        function getInitialValue(troncon, activity) {
+            if (defaultTroncons[troncon] && defaultTroncons[troncon].activities[activity]) {
+                return defaultTroncons[troncon].activities[activity].cumul;
+            }
+            return 0;
+        }
+
+        // Fonction pour recalculer tous les cumuls basés sur les valeurs initiales + historique
+        function recalculateAllCumuls() {
+            Object.keys(troncons).forEach(tronconName => {
+                Object.keys(troncons[tronconName].activities).forEach(activityName => {
+                    const initialValue = getInitialValue(tronconName, activityName);
+                    const totalFromHistory = dailyHistory
+                        .filter(entry => entry.troncon === tronconName && entry.activity === activityName)
+                        .reduce((sum, entry) => sum + entry.dailyProgress, 0);
+                    
+                    troncons[tronconName].activities[activityName].cumul = initialValue + totalFromHistory;
+                });
+            });
+        }
+
+        // Fonction d'initialisation des données
+        function initializeData() {
+            // Essayer de charger les données sauvegardées
+            const savedData = localStorage.getItem('sgtm_data');
+            if (savedData) {
+                try {
+                    const parsedData = JSON.parse(savedData);
+                    dailyHistory = parsedData.dailyHistory || [];
+                    
+                    // Toujours partir des données par défaut et recalculer avec l'historique
+                    troncons = JSON.parse(JSON.stringify(defaultTroncons));
+                    recalculateAllCumuls();
+                    
+                } catch (error) {
+                    console.error('Erreur lors du chargement des données:', error);
+                    troncons = JSON.parse(JSON.stringify(defaultTroncons));
+                    dailyHistory = [];
+                }
+            } else {
+                // Pas de données sauvegardées, utiliser les defaults
+                troncons = JSON.parse(JSON.stringify(defaultTroncons));
+                dailyHistory = [];
+            }
+        }
+
+        // Système d'authentification
+        document.getElementById('loginForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const username = document.getElementById('username').value.trim();
+            const accessCode = document.getElementById('accessCode').value.trim();
+            
+            if (authorizedUsers[username] && authorizedUsers[username] === accessCode) {
+                currentUser = username;
+                localStorage.setItem('sgtm_current_user', username);
+                document.getElementById('currentUser').textContent = username;
+                document.getElementById('loginPage').classList.add('hidden');
+                document.getElementById('dashboard').classList.remove('hidden');
+                
+                // Initialiser les données APRÈS la connexion
+                initializeData();
+                initializeDateInput();
+                populateTronconSelect();
+                renderTroncons();
+                updateStats();
+                createAllCharts();
+                showNotification('Connexion réussie!');
+            } else {
+                const errorDiv = document.getElementById('loginError');
+                errorDiv.textContent = 'Nom d\'utilisateur ou code d\'accès incorrect';
+                errorDiv.style.display = 'block';
+                setTimeout(() => {
+                    errorDiv.style.display = 'none';
+                }, 3000);
+            }
+        });
+
+        function logout() {
+            if (confirm('Êtes-vous sûr de vouloir vous déconnecter?')) {
+                // Sauvegarder avant de déconnecter
+                saveToDatabase();
+                currentUser = '';
+                localStorage.removeItem('sgtm_current_user');
+                document.getElementById('loginPage').classList.remove('hidden');
+                document.getElementById('dashboard').classList.add('hidden');
+                document.getElementById('loginForm').reset();
+            }
+        }
+
+        // Initialisation au chargement de la page
+        document.addEventListener('DOMContentLoaded', function() {
+            // Vérifier si l'utilisateur est déjà connecté
+            const savedUser = localStorage.getItem('sgtm_current_user');
+            if (savedUser) {
+                currentUser = savedUser;
+                document.getElementById('currentUser').textContent = savedUser;
+                document.getElementById('loginPage').classList.add('hidden');
+                document.getElementById('dashboard').classList.remove('hidden');
+                
+                // Initialiser les données
+                initializeData();
+                initializeDateInput();
+                populateTronconSelect();
+                renderTroncons();
+                updateStats();
+                createAllCharts();
+            }
+        });
+
+        function initializeDateInput() {
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('date').value = today;
+            document.getElementById('endDate').value = today;
+            
+            const oneWeekAgo = new Date();
+            oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+            document.getElementById('startDate').value = oneWeekAgo.toISOString().split('T')[0];
+        }
+
+        function populateTronconSelect() {
+            const select = document.getElementById('tronconSelect');
+            const chartSelect = document.getElementById('tronconChartSelect');
+            
+            select.innerHTML = '<option value="">Sélectionner un tronçon</option>';
+            chartSelect.innerHTML = '<option value="">Sélectionner un tronçon</option>';
+            
+            Object.keys(troncons).forEach(troncon => {
+                const option = document.createElement('option');
+                option.value = troncon;
+                option.textContent = `${troncon} (${troncons[troncon].longueur})`;
+                select.appendChild(option);
+                
+                const chartOption = option.cloneNode(true);
+                chartSelect.appendChild(chartOption);
+            });
+        }
+
+        // Function pour obtenir l'icône d'activité
+        function getActivityIcon(activity) {
+            const icons = {
+                'terrassement': 'fas fa-excavator',
+                'pose conduite': 'fas fa-tools',
+                'Livraison conduite': 'fas fa-truck',
+                'livraison conduite': 'fas fa-truck',
+                'lit de pose': 'fas fa-layer-group',
+                'RP': 'fas fa-fill',
+                'RS': 'fas fa-road'
+            };
+            return icons[activity] || 'fas fa-cog';
+        }
+
+        document.getElementById('tronconSelect').addEventListener('change', function() {
+            const selectedTroncon = this.value;
+            const activitySelect = document.getElementById('activitySelect');
+            
+            activitySelect.innerHTML = '<option value="">Sélectionner une activité</option>';
+            
+            if (selectedTroncon && troncons[selectedTroncon]) {
+                Object.keys(troncons[selectedTroncon].activities).forEach(activity => {
+                    const option = document.createElement('option');
+                    option.value = activity;
+                    option.textContent = activity.charAt(0).toUpperCase() + activity.slice(1);
+                    activitySelect.appendChild(option);
+                });
+            }
+        });
+
+        document.getElementById('tronconChartSelect').addEventListener('change', function() {
+            const selectedTroncon = this.value;
+            const activitySelect = document.getElementById('activityChartSelect');
+            
+            if (selectedTroncon) {
+                // Populate activity select for this troncon
+                activitySelect.innerHTML = '<option value="">Toutes les activités</option>';
+                Object.keys(troncons[selectedTroncon].activities).forEach(activity => {
+                    const option = document.createElement('option');
+                    option.value = activity;
+                    option.textContent = activity.charAt(0).toUpperCase() + activity.slice(1);
+                    activitySelect.appendChild(option);
+                });
+                
+                document.getElementById('linearChartContainer').style.display = 'block';
+                createLinearChart(selectedTroncon);
+            } else {
+                document.getElementById('linearChartContainer').style.display = 'none';
+                activitySelect.innerHTML = '<option value="">Toutes les activités</option>';
+            }
+        });
+
+        document.getElementById('activityChartSelect').addEventListener('change', function() {
+            const selectedTroncon = document.getElementById('tronconChartSelect').value;
+            if (selectedTroncon) {
+                createLinearChart(selectedTroncon, this.value);
+            }
+        });
+
+        document.getElementById('progressForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const troncon = document.getElementById('tronconSelect').value;
+            const activity = document.getElementById('activitySelect').value;
+            const dailyProgress = parseFloat(document.getElementById('dailyProgress').value);
+            const date = document.getElementById('date').value;
+            
+            if (!troncon || !activity || dailyProgress === '' || !date) {
+                showNotification('Veuillez remplir tous les champs', 'error');
+                return;
+            }
+            
+            if (dailyProgress < 0) {
+                showNotification('La valeur ne peut pas être négative', 'error');
+                return;
+            }
+            
+            // Ajouter à l'historique
+            dailyHistory.push({
+                date,
+                troncon,
+                activity,
+                dailyProgress,
+                user: currentUser,
+                timestamp: new Date().toISOString()
+            });
+            
+            // Mettre à jour le cumul avec la valeur initiale + historique
+            const initialValue = getInitialValue(troncon, activity);
+            const totalFromHistory = dailyHistory
+                .filter(entry => entry.troncon === troncon && entry.activity === activity)
+                .reduce((sum, entry) => sum + entry.dailyProgress, 0);
+            
+            troncons[troncon].activities[activity].cumul = initialValue + totalFromHistory;
+            
+            // Réinitialiser le formulaire
+            this.reset();
+            initializeDateInput();
+            document.getElementById('activitySelect').innerHTML = '<option value="">Sélectionner une activité</option>';
+            
+            // Mettre à jour l'affichage
+            renderTroncons();
+            updateStats();
+            updateAllCharts();
+            autoSave();
+            
+            showNotification(`Avancement ajouté: ${formatNumber(dailyProgress)} ml pour ${activity}`);
+        });
+
+        function renderTroncons() {
+            const container = document.getElementById('tronconsList');
+            container.innerHTML = '';
+            
+            Object.entries(troncons).forEach(([tronconName, tronconData]) => {
+                const tronconCard = document.createElement('div');
+                tronconCard.className = 'troncon-card';
+                
+                const header = document.createElement('div');
+                header.className = 'troncon-header';
+                header.innerHTML = `
+                    <i class="fas fa-road"></i> ${tronconName} - ${tronconData.longueur}
+                    <button style="float: right; background: #1a1a1a; color: #ffd700; border: 1px solid #ffd700; padding: 0.3rem 0.8rem; border-radius: 5px; cursor: pointer;" 
+                            onclick="addNewActivity('${tronconName}')">
+                        <i class="fas fa-plus"></i> Activité
+                    </button>
+                `;
+                
+                const table = document.createElement('table');
+                table.className = 'activities-table';
+                
+                const thead = document.createElement('thead');
+                thead.innerHTML = `
+                    <tr>
+                        <th><i class="fas fa-tasks"></i> Activité</th>
+                        <th><i class="fas fa-chart-line"></i> Cumul (ml)</th>
+                        <th><i class="fas fa-bullseye"></i> Objectif (ml)</th>
+                        <th><i class="fas fa-percentage"></i> Rendement</th>
+                        <th><i class="fas fa-calendar-day"></i> Avancement Journalier</th>
+                        <th><i class="fas fa-cogs"></i> Actions</th>
+                    </tr>
+                `;
+                
+                const tbody = document.createElement('tbody');
+                
+                Object.entries(tronconData.activities).forEach(([activityName, activityData]) => {
+                    const percentage = Math.round((activityData.cumul / activityData.target) * 100);
+                    const row = document.createElement('tr');
+                    
+                    // Calculer l'avancement journalier pour aujourd'hui
+                    const today = new Date().toISOString().split('T')[0];
+                    const todayProgress = dailyHistory
+                        .filter(entry => entry.date === today && entry.troncon === tronconName && entry.activity === activityName)
+                        .reduce((sum, entry) => sum + entry.dailyProgress, 0);
+                    
+                    row.innerHTML = `
+                        <td style="font-weight: 600; color: #2c3e50;">
+                            <span class="activity-icon"><i class="${getActivityIcon(activityName)}"></i></span>
+                            ${activityName}
+                        </td>
+                        <td>${formatNumber(activityData.cumul)} ml</td>
+                        <td>${formatNumber(activityData.target)} ml</td>
+                        <td>
+                            <div class="progress-bar">
+                                <div class="progress-fill" style="width: ${Math.min(percentage, 100)}%">
+                                    <div class="progress-text">${percentage}%</div>
+                                </div>
+                            </div>
+                        </td>
+                        <td>
+                            <input type="number" class="daily-input" style="width: 100px; padding: 0.3rem; border-radius: 5px; border: none; text-align: center;" 
+                                   min="0" step="0.1" placeholder="0" value="${todayProgress > 0 ? formatNumber(todayProgress) : ''}"
+                                   onchange="updateDailyProgress('${tronconName}', '${activityName}', this.value)">
+                            <div style="font-size: 0.8rem; color: #666; margin-top: 0.2rem;"><i class="fas fa-ruler"></i> ml/jour</div>
+                        </td>
+                        <td>
+                            <button class="edit-btn" onclick="editActivity('${tronconName}', '${activityName}')">
+                                <i class="fas fa-edit"></i> Modifier
+                            </button>
+                            <button class="delete-btn" onclick="deleteActivity('${tronconName}', '${activityName}')">
+                                <i class="fas fa-trash"></i> Supprimer
+                            </button>
+                        </td>
+                    `;
+                    
+                    tbody.appendChild(row);
+                });
+                
+                table.appendChild(thead);
+                table.appendChild(tbody);
+                tronconCard.appendChild(header);
+                tronconCard.appendChild(table);
+                container.appendChild(tronconCard);
+            });
+        }
+
+        function updateDailyProgress(troncon, activity, value) {
+            const today = new Date().toISOString().split('T')[0];
+            const dailyProgress = parseFloat(value) || 0;
+            
+            if (dailyProgress < 0) {
+                showNotification('La valeur ne peut pas être négative', 'error');
+                renderTroncons();
+                return;
+            }
+            
+            // Supprimer les entrées existantes pour aujourd'hui
+            dailyHistory = dailyHistory.filter(entry => 
+                !(entry.date === today && entry.troncon === troncon && entry.activity === activity)
+            );
+            
+            // Ajouter la nouvelle entrée si la valeur est positive
+            if (dailyProgress > 0) {
+                dailyHistory.push({
+                    date: today,
+                    troncon,
+                    activity,
+                    dailyProgress,
+                    user: currentUser,
+                    timestamp: new Date().toISOString()
+                });
+            }
+            
+            // Recalculer le cumul : valeur initiale + historique
+            const initialValue = getInitialValue(troncon, activity);
+            const totalFromHistory = dailyHistory
+                .filter(entry => entry.troncon === troncon && entry.activity === activity)
+                .reduce((sum, entry) => sum + entry.dailyProgress, 0);
+            
+            troncons[troncon].activities[activity].cumul = initialValue + totalFromHistory;
+            
+            updateStats();
+            updateAllCharts();
+            autoSave();
+            
+            if (dailyProgress > 0) {
+                showNotification(`Avancement journalier mis à jour: ${formatNumber(dailyProgress)} ml`);
+            }
+        }
+
+        function updateStats() {
+            const totalTroncons = Object.keys(troncons).length;
+            
+            let totalDistance = 0;
+            let totalTerrassement = 0;
+            let totalPose = 0;
+            let totalLivraison = 0;
+            let totalLitPose = 0;
+            let totalRP = 0;
+            let totalRS = 0;
+            
+            Object.values(troncons).forEach(troncon => {
+                totalDistance += troncon.distanceTotale;
+                
+                if (troncon.activities.terrassement) {
+                    totalTerrassement += troncon.activities.terrassement.cumul;
+                }
+                
+                if (troncon.activities['pose conduite']) {
+                    totalPose += troncon.activities['pose conduite'].cumul;
+                }
+                
+                if (troncon.activities['Livraison conduite']) {
+                    totalLivraison += troncon.activities['Livraison conduite'].cumul;
+                }
+                
+                if (troncon.activities['lit de pose']) {
+                    totalLitPose += troncon.activities['lit de pose'].cumul;
+                }
+                
+                if (troncon.activities['RP']) {
+                    totalRP += troncon.activities['RP'].cumul;
+                }
+                
+                if (troncon.activities['RS']) {
+                    totalRS += troncon.activities['RS'].cumul;
+                }
+            });
+            
+            document.getElementById('totalTroncons').textContent = totalTroncons;
+            document.getElementById('globalTerrassement').textContent = totalDistance > 0 ? Math.round((totalTerrassement / totalDistance) * 100) + '%' : '0%';
+            document.getElementById('globalPose').textContent = totalDistance > 0 ? Math.round((totalPose / totalDistance) * 100) + '%' : '0%';
+            document.getElementById('globalLivraison').textContent = totalDistance > 0 ? Math.round((totalLivraison / totalDistance) * 100) + '%' : '0%';
+            document.getElementById('globalLitPose').textContent = totalDistance > 0 ? Math.round((totalLitPose / totalDistance) * 100) + '%' : '0%';
+            document.getElementById('globalRP').textContent = totalDistance > 0 ? Math.round((totalRP / totalDistance) * 100) + '%' : '0%';
+            document.getElementById('globalRS').textContent = totalDistance > 0 ? Math.round((totalRS / totalDistance) * 100) + '%' : '0%';
+        }
+
+        function editActivity(troncon, activity) {
+            editingTroncon = troncon;
+            editingActivity = activity;
+            
+            const activityData = troncons[troncon].activities[activity];
+            document.getElementById('editActivity').value = activity;
+            document.getElementById('editCumul').value = activityData.cumul;
+            document.getElementById('editTarget').value = activityData.target;
+            
+            document.getElementById('editModal').style.display = 'block';
+        }
+
+        function deleteActivity(troncon, activity) {
+            if (confirm(`Êtes-vous sûr de vouloir supprimer l'activité "${activity}" du ${troncon}?`)) {
+                delete troncons[troncon].activities[activity];
+                
+                // Supprimer aussi de l'historique
+                dailyHistory = dailyHistory.filter(entry => 
+                    !(entry.troncon === troncon && entry.activity === activity)
+                );
+                
+                renderTroncons();
+                updateStats();
+                updateAllCharts();
+                autoSave();
+            }
+        }
+
+        function addNewActivity(troncon) {
+            const activityName = prompt('Nom de la nouvelle activité:');
+            const target = parseFloat(prompt('Objectif (quantité totale en ml):'));
+            
+            if (activityName && target) {
+                troncons[troncon].activities[activityName] = {
+                    cumul: 0,
+                    target: target,
+                    unit: 'ml'
+                };
+                
+                renderTroncons();
+                updateStats();
+                updateAllCharts();
+                autoSave();
+                showNotification(`Activité "${activityName}" ajoutée avec succès`);
+            }
+        }
+
+        function addNewTroncon() {
+            const name = prompt('Nom du nouveau tronçon:');
+            const longueur = prompt('Longueur du tronçon (ex: 5.2KM):');
+            const distanceTotale = parseFloat(prompt('Distance totale (en ml):'));
+            
+            if (name && longueur && distanceTotale && !isNaN(distanceTotale)) {
+                troncons[name] = {
+                    longueur: longueur,
+                    distanceTotale: distanceTotale,
+                    activities: {
+                        'terrassement': { cumul: 0, target: distanceTotale, unit: 'ml' }
+                    }
+                };
+                
+                populateTronconSelect();
+                renderTroncons();
+                updateStats();
+                updateAllCharts();
+                autoSave();
+                showNotification(`Tronçon "${name}" ajouté avec succès`);
+            } else {
+                showNotification('Données invalides', 'error');
+            }
+        }
+
+        document.getElementById('editForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const newCumul = parseFloat(document.getElementById('editCumul').value);
+            const newTarget = parseFloat(document.getElementById('editTarget').value);
+            
+            troncons[editingTroncon].activities[editingActivity].cumul = newCumul;
+            troncons[editingTroncon].activities[editingActivity].target = newTarget;
+            
+            closeModal();
+            renderTroncons();
+            updateStats();
+            updateAllCharts();
+            autoSave();
+            showNotification('Données modifiées avec succès');
+        });
+
+        function closeModal() {
+            document.getElementById('editModal').style.display = 'none';
+        }
+
+        document.querySelector('.close').addEventListener('click', closeModal);
+
+        window.addEventListener('click', function(event) {
+            const modal = document.getElementById('editModal');
+            if (event.target === modal) {
+                closeModal();
+            }
+        });
+
+        // Gestion des graphiques
+        function createAllCharts() {
+            createGlobalChart();
+        }
+
+        function createGlobalChart() {
+            const ctx = document.getElementById('globalChart').getContext('2d');
+            
+            if (charts.globalChart) {
+                charts.globalChart.destroy();
+            }
+            
+            const allActivities = new Set();
+            Object.values(troncons).forEach(tronconData => {
+                Object.keys(tronconData.activities).forEach(activity => {
+                     class="stat-value"><i class="fas fa-road"></i> <span id="totalTroncons">0</span></div>
                     <div class="stat-label">Tronçons Actifs</div>
                 </div>
                 <div class="stat-card">
@@ -1684,4 +1438,36 @@
                 <h3><i class="fas fa-download"></i> Export des Données</h3>
                 <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
                     <button class="btn btn-primary" onclick="exportToExcel()"><i class="fas fa-file-excel"></i> Export Excel</button>
-                    <button class="btn btn-primary" onclick="exportToPDF()"><i class="fas fa-file-
+                    <button class="btn btn-primary" onclick="exportToPDF()"><i class="fas fa-file-pdf"></i> Export PDF</button>
+                    <button class="btn btn-secondary" onclick="saveToDatabase()"><i class="fas fa-save"></i> Sauvegarder</button>
+                    <button class="btn btn-secondary" onclick="loadFromDatabase()"><i class="fas fa-folder-open"></i> Charger</button>
+                </div>
+            </div>
+
+            <!-- Contrôles -->
+            <div class="controls">
+                <h2><i class="fas fa-plus-circle"></i> Ajouter un Avancement Journalier</h2>
+                <form id="progressForm">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="tronconSelect"><i class="fas fa-road"></i> Tronçon</label>
+                            <select id="tronconSelect" required>
+                                <option value="">Sélectionner un tronçon</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="activitySelect"><i class="fas fa-tasks"></i> Activité</label>
+                            <select id="activitySelect" required>
+                                <option value="">Sélectionner une activité</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="dailyProgress"><i class="fas fa-ruler"></i> Avancement du jour (ml)</label>
+                            <input type="number" id="dailyProgress" step="0.1" min="0" placeholder="Quantité en ml (0 accepté)" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="date"><i class="fas fa-calendar"></i> Date</label>
+                            <input type="date" id="date" required>
+                        </div>
+                    </div>
+                    <div
