@@ -206,6 +206,19 @@
         </div>
     </div>
 
+    <!-- Variables globales partagées -->
+    <script>
+        // Variables globales qui doivent être disponibles dans tous les fichiers
+        window.troncons = {};
+        window.dailyHistory = [];
+        window.charts = {};
+        window.currentUser = '';
+        window.dateFilter = null;
+        window.editingTroncon = null;
+        window.editingActivity = null;
+    </script>
+    
+    <!-- Scripts dans l'ordre correct -->
     <script src="js/auth.js"></script>
     <script src="js/charts.js"></script>
     <script src="js/export.js"></script>
