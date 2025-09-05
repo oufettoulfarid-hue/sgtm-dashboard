@@ -6,8 +6,8 @@ const authorizedUsers = {
     'Troncon4': 'Badr4'
 };
 
-// Variables globales pour l'authentification
-let currentUser = '';
+// Utiliser les variables globales
+let currentUser = window.currentUser;
 
 // Système d'authentification
 document.getElementById('loginForm').addEventListener('submit', function(e) {
