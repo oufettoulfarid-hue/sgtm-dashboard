@@ -724,6 +724,72 @@
             <!-- Statistiques générales -->
             <div class="stats-grid">
                 <div class="stat-card">
+                    <div class="stat-value"><i class="fas fa-road"></i> <span id="totalTroncons">0</span></div>
+                    <div class="stat-label">Tronçons Actifs</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value"><i class="fas fa-excavator"></i> <span id="globalTerrassement">0%</span></div>
+                    <div class="stat-label">Terrassement Global</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value"><i class="fas fa-tools"></i> <span id="globalPose">0%</span></div>
+                    <div class="stat-label">Pose Global</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value"><i class="fas fa-truck"></i> <span id="globalLivraison">0%</span></div>
+                    <div class="stat-label">Livraison Global</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value"><i class="fas fa-layer-group"></i> <span id="globalLitPose">0%</span></div>
+                    <div class="stat-label">Lit de Pose Global</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value"><i class="fas fa-fill"></i> <span id="globalRP">0%</span></div>
+                    <div class="stat-label">RP Global</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value"><i class="fas fa-road"></i> <span id="globalRS">0%</span></div>
+                    <div class="stat-label">RS Global</div>
+                </div>
+            </div>
+
+            <!-- Section exportation -->
+            <div class="export-section">
+                <h3><i class="fas fa-download"></i> Export des Données</h3>
+                <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+                    <button class="btn btn-primary" onclick="exportToExcel()"><i class="fas fa-file-excel"></i> Export Excel</button>
+                    <button class="btn btn-primary" onclick="exportToPDF()"><i class="fas fa-file-pdf"></i> Export PDF</button>
+                    <button class="btn btn-secondary" onclick="saveToDatabase()"><i class="fas fa-save"></i> Sauvegarder</button>
+                    <button class="btn btn-secondary" onclick="loadFromDatabase()"><i class="fas fa-folder-open"></i> Charger</button>
+                </div>
+            </div>
+
+            <!-- Contrôles -->
+            <div class="controls">
+                <h2><i class="fas fa-plus-circle"></i> Ajouter un Avancement Journalier</h2>
+                <form id="progressForm">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="tronconSelect"><i class="fas fa-road"></i> Tronçon</label>
+                            <select id="tronconSelect" required>
+                                <option value="">Sélectionner un tronçon</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="activitySelect"><i class="fas fa-tasks"></i> Activité</label>
+                            <select id="activitySelect" required>
+                                <option value="">Sélectionner une activité</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="dailyProgress"><i class="fas fa-ruler"></i> Avancement du jour (ml)</label>
+                            <input type="number" id="dailyProgress" step="0.1" min="0" placeholder="Quantité en ml (0 accepté)" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="date"><i class="fas fa-calendar"></i> Date</label>
+                            <input type="date" id="date" required>
+                        </div>
+                    </div>
                     <div class="actions">
                         <button type="submit" class="btn btn-primary"><i class="fas fa-plus"></i> Ajouter l'Avancement</button>
                     </div>
@@ -895,6 +961,9 @@
                     // Toujours partir des données par défaut et recalculer avec l'historique
                     troncons = JSON.parse(JSON.stringify(defaultTroncons));
                     recalculateAllCumuls();
+                    
+                    // Vérifier et corriger les données après chargement
+                    checkAndFixData();
                     
                 } catch (error) {
                     console.error('Erreur lors du chargement des données:', error);
@@ -1392,6 +1461,7 @@
         // Gestion des graphiques
         function createAllCharts() {
             createGlobalChart();
+            createActivityPieChart();
         }
 
         function createGlobalChart() {
@@ -1404,70 +1474,739 @@
             const allActivities = new Set();
             Object.values(troncons).forEach(tronconData => {
                 Object.keys(tronconData.activities).forEach(activity => {
-                     class="stat-value"><i class="fas fa-road"></i> <span id="totalTroncons">0</span></div>
-                    <div class="stat-label">Tronçons Actifs</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-value"><i class="fas fa-excavator"></i> <span id="globalTerrassement">0%</span></div>
-                    <div class="stat-label">Terrassement Global</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-value"><i class="fas fa-tools"></i> <span id="globalPose">0%</span></div>
-                    <div class="stat-label">Pose Global</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-value"><i class="fas fa-truck"></i> <span id="globalLivraison">0%</span></div>
-                    <div class="stat-label">Livraison Global</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-value"><i class="fas fa-layer-group"></i> <span id="globalLitPose">0%</span></div>
-                    <div class="stat-label">Lit de Pose Global</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-value"><i class="fas fa-fill"></i> <span id="globalRP">0%</span></div>
-                    <div class="stat-label">RP Global</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-value"><i class="fas fa-road"></i> <span id="globalRS">0%</span></div>
-                    <div class="stat-label">RS Global</div>
-                </div>
-            </div>
+                    allActivities.add(activity);
+                });
+            });
+            
+            const activityArray = Array.from(allActivities);
+            const tronconNames = Object.keys(troncons);
+            
+            const activityColors = {
+                'terrassement': '#f4a261',
+                'pose conduite': '#2a9d8f',
+                'Livraison conduite': '#e76f51',
+                'lit de pose': '#264653',
+                'RP': '#457b9d',
+                'RS': '#9c89b8'
+            };
+            
+            const datasets = activityArray.map(activity => {
+                const data = tronconNames.map(troncon => {
+                    const tronconData = troncons[troncon];
+                    if (tronconData.activities[activity]) {
+                        return Math.round((tronconData.activities[activity].cumul / tronconData.activities[activity].target) * 100);
+                    }
+                    return 0;
+                });
+                
+                return {
+                    label: activity.charAt(0).toUpperCase() + activity.slice(1),
+                    data: data,
+                    backgroundColor: activityColors[activity] || '#ffd700',
+                    borderColor: '#1a1a1a',
+                    borderWidth: 1
+                };
+            });
+            
+            charts.globalChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: tronconNames,
+                    datasets: datasets
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                            labels: {
+                                color: '#ffd700',
+                                font: {
+                                    size: 11
+                                },
+                                usePointStyle: true,
+                                padding: 15
+                            }
+                        },
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false,
+                            callbacks: {
+                                label: function(context) {
+                                    return `${context.dataset.label}: ${context.parsed.y}%`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 100,
+                            ticks: {
+                                color: '#ffd700',
+                                callback: function(value) {
+                                    return value + '%';
+                                }
+                            },
+                            grid: {
+                                color: 'rgba(255, 215, 0, 0.2)'
+                            },
+                            title: {
+                                display: true,
+                                text: 'Pourcentage de progression',
+                                color: '#ffd700'
+                            }
+                        },
+                        x: {
+                            ticks: {
+                                color: '#ffd700'
+                            },
+                            grid: {
+                                color: 'rgba(255, 215, 0, 0.2)'
+                            },
+                            title: {
+                                display: true,
+                                text: 'Tronçons',
+                                color: '#ffd700'
+                            }
+                        }
+                    }
+                }
+            });
+        }
 
-            <!-- Section exportation -->
-            <div class="export-section">
-                <h3><i class="fas fa-download"></i> Export des Données</h3>
-                <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
-                    <button class="btn btn-primary" onclick="exportToExcel()"><i class="fas fa-file-excel"></i> Export Excel</button>
-                    <button class="btn btn-primary" onclick="exportToPDF()"><i class="fas fa-file-pdf"></i> Export PDF</button>
-                    <button class="btn btn-secondary" onclick="saveToDatabase()"><i class="fas fa-save"></i> Sauvegarder</button>
-                    <button class="btn btn-secondary" onclick="loadFromDatabase()"><i class="fas fa-folder-open"></i> Charger</button>
-                </div>
-            </div>
+        function createActivityPieChart() {
+            // Cette fonction n'est plus utilisée car nous n'avons qu'un graphique principal
+        }
 
-            <!-- Contrôles -->
-            <div class="controls">
-                <h2><i class="fas fa-plus-circle"></i> Ajouter un Avancement Journalier</h2>
-                <form id="progressForm">
-                    <div class="form-grid">
-                        <div class="form-group">
-                            <label for="tronconSelect"><i class="fas fa-road"></i> Tronçon</label>
-                            <select id="tronconSelect" required>
-                                <option value="">Sélectionner un tronçon</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label for="activitySelect"><i class="fas fa-tasks"></i> Activité</label>
-                            <select id="activitySelect" required>
-                                <option value="">Sélectionner une activité</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label for="dailyProgress"><i class="fas fa-ruler"></i> Avancement du jour (ml)</label>
-                            <input type="number" id="dailyProgress" step="0.1" min="0" placeholder="Quantité en ml (0 accepté)" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="date"><i class="fas fa-calendar"></i> Date</label>
-                            <input type="date" id="date" required>
-                        </div>
-                    </div>
-                    <div
+        function createLinearChart(tronconName, specificActivity = null) {
+            const ctx = document.getElementById('linearChart').getContext('2d');
+            
+            if (charts.linearChart) {
+                charts.linearChart.destroy();
+            }
+            
+            if (!troncons[tronconName]) return;
+            
+            // Filtrer l'historique pour ce tronçon
+            let filteredHistory = dailyHistory.filter(entry => entry.troncon === tronconName);
+            
+            // Appliquer le filtre de date si nécessaire
+            if (dateFilter) {
+                filteredHistory = filteredHistory.filter(entry => 
+                    entry.date >= dateFilter.start && entry.date <= dateFilter.end
+                );
+            }
+            
+            // Filtrer par activité spécifique si sélectionnée
+            if (specificActivity) {
+                filteredHistory = filteredHistory.filter(entry => entry.activity === specificActivity);
+            }
+            
+            // Obtenir toutes les dates uniques et les trier
+            const allDates = [...new Set(filteredHistory.map(entry => entry.date))].sort();
+            
+            if (allDates.length === 0) {
+                // Si pas de données, créer un graphique avec les données actuelles
+                const tronconData = troncons[tronconName];
+                const activities = specificActivity ? [specificActivity] : Object.keys(tronconData.activities);
+                
+                const activityColors = {
+                    'terrassement': '#f4a261',
+                    'pose conduite': '#2a9d8f',
+                    'Livraison conduite': '#e76f51',
+                    'lit de pose': '#264653',
+                    'RP': '#457b9d',
+                    'RS': '#9c89b8'
+                };
+                
+                const datasets = activities.map(activity => {
+                    const currentValue = tronconData.activities[activity] ? tronconData.activities[activity].cumul : 0;
+                    return {
+                        label: activity,
+                        data: [currentValue],
+                        borderColor: activityColors[activity] || '#ffd700',
+                        backgroundColor: (activityColors[activity] || '#ffd700') + '20',
+                        fill: false,
+                        tension: 0.1
+                    };
+                });
+                
+                charts.linearChart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: ['Cumul actuel'],
+                        datasets: datasets
+                    },
+                    options: getLinearChartOptions()
+                });
+                return;
+            }
+            
+            // Obtenir les activités pour ce tronçon
+            const activities = specificActivity ? [specificActivity] : Object.keys(troncons[tronconName].activities);
+            
+            const activityColors = {
+                'terrassement': '#f4a261',
+                'pose conduite': '#2a9d8f',
+                'Livraison conduite': '#e76f51',
+                'lit de pose': '#264653',
+                'RP': '#457b9d',
+                'RS': '#9c89b8'
+            };
+            
+            // Créer les datasets pour chaque activité
+            const datasets = activities.map(activity => {
+                const data = [];
+                let cumulativeSum = getInitialValue(tronconName, activity); // Commencer avec la valeur initiale
+                
+                allDates.forEach(date => {
+                    const dayEntries = filteredHistory.filter(entry => 
+                        entry.date === date && entry.activity === activity
+                    );
+                    
+                    const dayTotal = dayEntries.reduce((sum, entry) => sum + entry.dailyProgress, 0);
+                    cumulativeSum += dayTotal;
+                    data.push(cumulativeSum);
+                });
+                
+                return {
+                    label: activity,
+                    data: data,
+                    borderColor: activityColors[activity] || '#ffd700',
+                    backgroundColor: (activityColors[activity] || '#ffd700') + '20',
+                    fill: false,
+                    tension: 0.1,
+                    borderWidth: 2,
+                    pointRadius: 4,
+                    pointHoverRadius: 6
+                };
+            });
+            
+            charts.linearChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: allDates.map(date => {
+                        const d = new Date(date);
+                        return `${d.getDate()}/${d.getMonth() + 1}`;
+                    }),
+                    datasets: datasets
+                },
+                options: getLinearChartOptions()
+            });
+        }
+
+        function getLinearChartOptions() {
+            return {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'top',
+                        labels: {
+                            color: '#ffd700',
+                            font: {
+                                size: 11
+                            },
+                            usePointStyle: true
+                        }
+                    },
+                    tooltip: {
+                        mode: 'index',
+                        intersect: false,
+                        callbacks: {
+                            label: function(context) {
+                                return `${context.dataset.label}: ${formatNumber(context.parsed.y)} ml`;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            color: '#ffd700',
+                            callback: function(value) {
+                                return formatNumber(value) + ' ml';
+                            }
+                        },
+                        grid: {
+                            color: 'rgba(255, 215, 0, 0.2)'
+                        },
+                        title: {
+                            display: true,
+                            text: 'Cumul des travaux (ml)',
+                            color: '#ffd700'
+                        }
+                    },
+                    x: {
+                        ticks: {
+                            color: '#ffd700',
+                            maxRotation: 45,
+                            minRotation: 45
+                        },
+                        grid: {
+                            color: 'rgba(255, 215, 0, 0.2)'
+                        },
+                        title: {
+                            display: true,
+                            text: 'Date',
+                            color: '#ffd700'
+                        }
+                    }
+                },
+                interaction: {
+                    mode: 'nearest',
+                    axis: 'x',
+                    intersect: false
+                }
+            };
+        }
+
+        function updateAllCharts() {
+            createAllCharts();
+            
+            // Recréer le graphique linéaire si un tronçon est sélectionné
+            const selectedTroncon = document.getElementById('tronconChartSelect').value;
+            const selectedActivity = document.getElementById('activityChartSelect').value;
+            if (selectedTroncon) {
+                createLinearChart(selectedTroncon, selectedActivity || null);
+            }
+        }
+
+        // Fonctions de filtrage par date
+        function filterByDate() {
+            const startDate = document.getElementById('startDate').value;
+            const endDate = document.getElementById('endDate').value;
+            
+            if (!startDate || !endDate) {
+                showNotification('Veuillez sélectionner les deux dates', 'error');
+                return;
+            }
+            
+            if (startDate > endDate) {
+                showNotification('La date de début ne peut pas être supérieure à la date de fin', 'error');
+                return;
+            }
+            
+            dateFilter = { start: startDate, end: endDate };
+            
+            showNotification(`Filtrage appliqué du ${startDate} au ${endDate}`);
+            
+            // Recréer le graphique linéaire si un tronçon est sélectionné
+            const selectedTroncon = document.getElementById('tronconChartSelect').value;
+            const selectedActivity = document.getElementById('activityChartSelect').value;
+            if (selectedTroncon) {
+                createLinearChart(selectedTroncon, selectedActivity || null);
+            }
+        }
+
+        function clearDateFilter() {
+            dateFilter = null;
+            document.getElementById('startDate').value = '';
+            document.getElementById('endDate').value = '';
+            
+            showNotification('Filtre de date supprimé');
+            
+            // Recréer le graphique linéaire si un tronçon est sélectionné
+            const selectedTroncon = document.getElementById('tronconChartSelect').value;
+            const selectedActivity = document.getElementById('activityChartSelect').value;
+            if (selectedTroncon) {
+                createLinearChart(selectedTroncon, selectedActivity || null);
+            }
+        }
+
+        // Fonctions d'export
+        function exportToExcel() {
+            const wb = XLSX.utils.book_new();
+            
+            // Feuille principale - Résumé
+            const summaryData = [];
+            summaryData.push(['SGTM - Tableau de Bord Travaux']);
+            summaryData.push(['Date d\'export:', new Date().toLocaleDateString('fr-FR')]);
+            summaryData.push(['Exporté par:', currentUser]);
+            summaryData.push([]);
+            summaryData.push(['Tronçon', 'Longueur', 'Activité', 'Cumul (ml)', 'Objectif (ml)', 'Rendement (%)']);
+            
+            Object.entries(troncons).forEach(([tronconName, tronconData]) => {
+                Object.entries(tronconData.activities).forEach(([activityName, activityData]) => {
+                    const percentage = Math.round((activityData.cumul / activityData.target) * 100);
+                    summaryData.push([
+                        tronconName,
+                        tronconData.longueur,
+                        activityName,
+                        activityData.cumul,
+                        activityData.target,
+                        percentage
+                    ]);
+                });
+            });
+            
+            const ws1 = XLSX.utils.aoa_to_sheet(summaryData);
+            XLSX.utils.book_append_sheet(wb, ws1, 'Résumé');
+            
+            // Feuille historique
+            if (dailyHistory.length > 0) {
+                const historyData = [['Date', 'Tronçon', 'Activité', 'Avancement (ml)', 'Utilisateur', 'Timestamp']];
+                dailyHistory.forEach(entry => {
+                    historyData.push([
+                        entry.date, 
+                        entry.troncon, 
+                        entry.activity, 
+                        entry.dailyProgress,
+                        entry.user || 'N/A',
+                        entry.timestamp || 'N/A'
+                    ]);
+                });
+                
+                const ws2 = XLSX.utils.aoa_to_sheet(historyData);
+                XLSX.utils.book_append_sheet(wb, ws2, 'Historique');
+            }
+            
+            XLSX.writeFile(wb, `SGTM_Travaux_${new Date().toISOString().split('T')[0]}.xlsx`);
+            showNotification('Export Excel réussi!');
+        }
+
+        function exportToPDF() {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF('p', 'mm', 'a4');
+            
+            // Fonction pour formater les nombres pour le PDF (éviter les séparateurs français)
+            function formatNumberForPDF(num) {
+                return num.toFixed(1).replace(/\.0$/, '');
+            }
+            
+            // En-tête avec logo et titre
+            doc.setFontSize(24);
+            doc.setTextColor(255, 215, 0);
+            doc.text('SGTM - Tableau de Bord Travaux', 20, 25);
+            
+            // Informations d'export
+            doc.setFontSize(12);
+            doc.setTextColor(0, 0, 0);
+            const now = new Date();
+            const dateStr = `${now.getDate().toString().padStart(2, '0')}/${(now.getMonth() + 1).toString().padStart(2, '0')}/${now.getFullYear()}`;
+            const timeStr = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+            
+            doc.text(`Date d'export: ${dateStr} à ${timeStr}`, 20, 35);
+            doc.text(`Exporté par: ${currentUser}`, 20, 42);
+            
+            // Ligne de séparation
+            doc.setDrawColor(255, 215, 0);
+            doc.setLineWidth(1);
+            doc.line(20, 47, 190, 47);
+            
+            let startY = 55;
+            
+            // Couleurs pour les tableaux
+            const tableColors = [
+                [255, 235, 59],   // Jaune
+                [76, 175, 80],    // Vert
+                [33, 150, 243],   // Bleu
+                [255, 152, 0],    // Orange
+                [156, 39, 176],   // Violet
+                [244, 67, 54],    // Rouge
+                [0, 150, 136]     // Teal
+            ];
+            
+            let colorIndex = 0;
+            
+            // Créer un tableau pour chaque tronçon
+            Object.entries(troncons).forEach(([tronconName, tronconData]) => {
+                // Vérifier si on a besoin d'une nouvelle page
+                if (startY > 220) {
+                    doc.addPage();
+                    startY = 20;
+                }
+                
+                // Titre du tronçon
+                doc.setFontSize(16);
+                doc.setTextColor(0, 0, 0);
+                doc.text(`${tronconName} - ${tronconData.longueur}`, 20, startY);
+                
+                // Données du tableau
+                const tableData = [];
+                Object.entries(tronconData.activities).forEach(([activityName, activityData]) => {
+                    const percentage = Math.round((activityData.cumul / activityData.target) * 100);
+                    tableData.push([
+                        activityName,
+                        formatNumberForPDF(activityData.cumul) + ' ml',
+                        formatNumberForPDF(activityData.target) + ' ml',
+                        percentage + '%'
+                    ]);
+                });
+                
+                // Couleur pour ce tableau
+                const currentColor = tableColors[colorIndex % tableColors.length];
+                colorIndex++;
+                
+                // Créer le tableau
+                doc.autoTable({
+                    head: [['Activité', 'Cumul (ml)', 'Objectif (ml)', 'Rendement (%)']],
+                    body: tableData,
+                    startY: startY + 5,
+                    theme: 'grid',
+                    headStyles: { 
+                        fillColor: currentColor,
+                        textColor: [0, 0, 0],
+                        fontStyle: 'bold',
+                        fontSize: 11
+                    },
+                    bodyStyles: {
+                        fontSize: 10
+                    },
+                    alternateRowStyles: { 
+                        fillColor: [currentColor[0], currentColor[1], currentColor[2], 0.1]
+                    },
+                    margin: { left: 20, right: 20 },
+                    columnStyles: {
+                        0: { cellWidth: 45 },
+                        1: { cellWidth: 35, halign: 'right' },
+                        2: { cellWidth: 35, halign: 'right' },
+                        3: { cellWidth: 25, halign: 'center' }
+                    }
+                });
+                
+                startY = doc.lastAutoTable.finalY + 15;
+            });
+            
+            // Ajouter une nouvelle page pour les graphiques
+            doc.addPage();
+            
+            // Titre pour les graphiques
+            doc.setFontSize(18);
+            doc.setTextColor(255, 215, 0);
+            doc.text('Graphiques de Progression', 20, 25);
+            
+            // Capturer et ajouter le graphique principal
+            try {
+                const canvas = document.getElementById('globalChart');
+                if (canvas) {
+                    const canvasImg = canvas.toDataURL('image/png', 1.0);
+                    doc.addImage(canvasImg, 'PNG', 20, 35, 170, 100);
+                }
+            } catch (error) {
+                console.error('Erreur lors de la capture du graphique:', error);
+                doc.setFontSize(12);
+                doc.setTextColor(255, 0, 0);
+                doc.text('Erreur: Impossible de capturer le graphique', 20, 80);
+            }
+            
+            // Ajouter le graphique linéaire s'il existe
+            try {
+                const linearCanvas = document.getElementById('linearChart');
+                if (linearCanvas && charts.linearChart) {
+                    doc.addImage(linearCanvas.toDataURL('image/png', 1.0), 'PNG', 20, 150, 170, 100);
+                }
+            } catch (error) {
+                console.error('Erreur lors de la capture du graphique linéaire:', error);
+            }
+            
+            // Ajouter une page pour les statistiques globales
+            doc.addPage();
+            doc.setFontSize(18);
+            doc.setTextColor(255, 215, 0);
+            doc.text('Statistiques Globales', 20, 25);
+            
+            // Créer un tableau de statistiques
+            const statsData = [
+                ['Nombre total de tronçons', document.getElementById('totalTroncons').textContent],
+                ['Terrassement global', document.getElementById('globalTerrassement').textContent],
+                ['Pose globale', document.getElementById('globalPose').textContent],
+                ['Livraison globale', document.getElementById('globalLivraison').textContent],
+                ['Lit de pose global', document.getElementById('globalLitPose').textContent],
+                ['RP global', document.getElementById('globalRP').textContent],
+                ['RS global', document.getElementById('globalRS').textContent]
+            ];
+            
+            doc.autoTable({
+                head: [['Indicateur', 'Valeur']],
+                body: statsData,
+                startY: 35,
+                theme: 'grid',
+                headStyles: { 
+                    fillColor: [63, 81, 181],
+                    textColor: [255, 255, 255],
+                    fontStyle: 'bold'
+                },
+                bodyStyles: {
+                    fontSize: 11
+                },
+                alternateRowStyles: { 
+                    fillColor: [245, 245, 245]
+                },
+                margin: { left: 20, right: 20 },
+                columnStyles: {
+                    0: { cellWidth: 120 },
+                    1: { cellWidth: 50, halign: 'center', fontStyle: 'bold' }
+                }
+            });
+            
+            // Footer sur toutes les pages
+            const pageCount = doc.internal.getNumberOfPages();
+            for (let i = 1; i <= pageCount; i++) {
+                doc.setPage(i);
+                doc.setFontSize(8);
+                doc.setTextColor(128, 128, 128);
+                doc.text(`Page ${i} sur ${pageCount}`, 20, 285);
+                doc.text(`Généré par SGTM Dashboard v3.1`, 150, 285);
+            }
+            
+            // Nom du fichier avec date
+            const filename = `SGTM_Travaux_${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}-${now.getDate().toString().padStart(2, '0')}.pdf`;
+            doc.save(filename);
+            
+            showNotification('Export PDF réussi avec graphiques!');
+        }
+
+        // Fonctions de sauvegarde et chargement
+        function saveToDatabase() {
+            const dataToSave = {
+                troncons: troncons,
+                dailyHistory: dailyHistory,
+                lastUpdated: new Date().toISOString(),
+                updatedBy: currentUser,
+                version: '3.1'
+            };
+            
+            localStorage.setItem('sgtm_data', JSON.stringify(dataToSave));
+            localStorage.setItem('sgtm_current_user', currentUser);
+            
+            showNotification('Données sauvegardées avec succès!');
+        }
+
+        function loadFromDatabase() {
+            const savedData = localStorage.getItem('sgtm_data');
+            if (savedData) {
+                try {
+                    const parsedData = JSON.parse(savedData);
+                    dailyHistory = parsedData.dailyHistory || [];
+
+                    // Toujours partir des données par défaut et recalculer
+                    troncons = JSON.parse(JSON.stringify(defaultTroncons));
+                    recalculateAllCumuls();
+                    
+                    renderTroncons();
+                    updateStats();
+                    updateAllCharts();
+                    populateTronconSelect();
+                    showNotification('Données chargées avec succès!');
+                } catch (error) {
+                    console.error('Erreur lors du chargement des données:', error);
+                    showNotification('Erreur lors du chargement des données', 'error');
+                }
+            }
+        }
+
+        function showDailyReport() {
+            const today = new Date().toISOString().split('T')[0];
+            const todayEntries = dailyHistory.filter(entry => entry.date === today);
+            
+            if (todayEntries.length === 0) {
+                showNotification('Aucune activité enregistrée pour aujourd\'hui', 'error');
+                return;
+            }
+            
+            let report = `RAPPORT JOURNALIER - ${today}\n\n`;
+            let totalVolume = 0;
+            
+            const groupedEntries = {};
+            todayEntries.forEach(entry => {
+                const key = `${entry.troncon} - ${entry.activity}`;
+                if (!groupedEntries[key]) {
+                    groupedEntries[key] = 0;
+                }
+                groupedEntries[key] += entry.dailyProgress;
+                totalVolume += entry.dailyProgress;
+            });
+            
+            Object.entries(groupedEntries).forEach(([key, value]) => {
+                report += `${key}: ${formatNumber(value)} ml\n`;
+            });
+            
+            report += `\nVolume total du jour: ${formatNumber(totalVolume)} ml`;
+            report += `\nNombre d'entrées: ${todayEntries.length}`;
+            alert(report);
+        }
+
+        function resetData() {
+            if (confirm('Êtes-vous sûr de vouloir réinitialiser toutes les données? Cette action est irréversible.')) {
+                // Réinitialiser avec les valeurs par défaut
+                troncons = JSON.parse(JSON.stringify(defaultTroncons));
+                dailyHistory = [];
+                
+                renderTroncons();
+                updateStats();
+                updateAllCharts();
+                populateTronconSelect();
+                autoSave();
+                showNotification('Données réinitialisées');
+            }
+        }
+
+        function formatNumber(num) {
+            return num.toLocaleString('fr-FR', {
+                minimumFractionDigits: 0,
+                maximumFractionDigits: 1
+            });
+        }
+
+        // Auto-sauvegarde
+        function autoSave() {
+            saveToDatabase();
+            
+            // Afficher l'indicateur d'auto-sauvegarde
+            const indicator = document.getElementById('autoSaveIndicator');
+            indicator.classList.add('show');
+            setTimeout(() => {
+                indicator.classList.remove('show');
+            }, 2000);
+        }
+
+        // Auto-sauvegarde toutes les 30 secondes
+        setInterval(autoSave, 30000);
+
+        // Notifications
+        function showNotification(message, type = 'success') {
+            const notification = document.createElement('div');
+            notification.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background: ${type === 'success' ? 'linear-gradient(135deg, #ffd700 0%, #ffed4e 100%)' : 'linear-gradient(135deg, #ff4444 0%, #cc0000 100%)'};
+                color: ${type === 'success' ? '#1a1a1a' : 'white'};
+                padding: 1rem 1.5rem;
+                border-radius: 8px;
+                box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+                z-index: 1001;
+                animation: slideInRight 0.3s ease;
+                font-weight: 600;
+                max-width: 300px;
+                display: flex;
+                align-items: center;
+                gap: 0.5rem;
+            `;
+            
+            const icon = type === 'success' ? '<i class="fas fa-check-circle"></i>' : '<i class="fas fa-exclamation-triangle"></i>';
+            notification.innerHTML = `${icon} ${message}`;
+            
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                notification.style.animation = 'slideOutRight 0.3s ease';
+                setTimeout(() => {
+                    if (document.body.contains(notification)) {
+                        document.body.removeChild(notification);
+                    }
+                }, 300);
+            }, 3000);
+        }
+
+        // Sauvegarde automatique avant de quitter
+        window.addEventListener('beforeunload', function() {
+            autoSave();
+        });
+    </script>
+</body>
+</html>
