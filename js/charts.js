@@ -1,5 +1,8 @@
-// Variables globales pour les graphiques
-let charts = {};
+// Utiliser les variables globales
+let charts = window.charts || {};
+let troncons = window.troncons || {};
+let dailyHistory = window.dailyHistory || [];
+let dateFilter = window.dateFilter || null;
 
 // Gestion des graphiques
 function createAllCharts() {
@@ -117,6 +120,9 @@ function createGlobalChart() {
             }
         }
     });
+    
+    // Sauvegarder dans les variables globales
+    window.charts = charts;
 }
 
 function createActivityPieChart() {
@@ -184,6 +190,9 @@ function createLinearChart(tronconName, specificActivity = null) {
             },
             options: getLinearChartOptions()
         });
+        
+        // Sauvegarder dans les variables globales
+        window.charts = charts;
         return;
     }
     
@@ -202,7 +211,7 @@ function createLinearChart(tronconName, specificActivity = null) {
     // Créer les datasets pour chaque activité
     const datasets = activities.map(activity => {
         const data = [];
-        let cumulativeSum = getInitialValue(tronconName, activity); // Commencer avec la valeur initiale
+        let cumulativeSum = window.getInitialValue ? window.getInitialValue(tronconName, activity) : 0; // Commencer avec la valeur initiale
         
         allDates.forEach(date => {
             const dayEntries = filteredHistory.filter(entry => 
@@ -238,6 +247,9 @@ function createLinearChart(tronconName, specificActivity = null) {
         },
         options: getLinearChartOptions()
     });
+    
+    // Sauvegarder dans les variables globales
+    window.charts = charts;
 }
 
 function getLinearChartOptions() {
@@ -260,6 +272,12 @@ function getLinearChartOptions() {
                 intersect: false,
                 callbacks: {
                     label: function(context) {
+                        const formatNumber = window.formatNumber || function(num) {
+                            return num.toLocaleString('fr-FR', {
+                                minimumFractionDigits: 0,
+                                maximumFractionDigits: 1
+                            });
+                        };
                         return `${context.dataset.label}: ${formatNumber(context.parsed.y)} ml`;
                     }
                 }
@@ -271,6 +289,12 @@ function getLinearChartOptions() {
                 ticks: {
                     color: '#ffd700',
                     callback: function(value) {
+                        const formatNumber = window.formatNumber || function(num) {
+                            return num.toLocaleString('fr-FR', {
+                                minimumFractionDigits: 0,
+                                maximumFractionDigits: 1
+                            });
+                        };
                         return formatNumber(value) + ' ml';
                     }
                 },
